@@ -285,48 +285,53 @@ app.get('/api/assemblies', async (req, res) => {
     }
 });
 
-app.get('/api/assemblies/status', async (req, res) => {
+app.get('/api/assemblies/details', async (req, res) => {
     const { startDate, endDate } = req.query;
-    try {
-        const whereClause = {
-            status: {
-                [Sequelize.Op.or]: ['completed', 'in-progress']  // Fetch both 'completed' and 'in-progress'
-            }
-        };
 
-        // Filter for "completed" assemblies between startDate and endDate
+    try {
+        let startDateFilter;
+        let endDateFilter;
+
+        // Check if startDate and endDate are provided
         if (startDate && endDate) {
-            whereClause[Sequelize.Op.or] = [
-                {
-                    status: 'completed',
-                    startTime: {
-                        [Sequelize.Op.between]: [new Date(startDate), new Date(endDate)]
-                    }
-                },
-                {
-                    status: 'in-progress',
-                    startTime: {
-                        [Sequelize.Op.gte]: new Date(startDate)  // Filter in-progress assemblies by startDate only
-                    }
-                }
-            ];
-        } else if (startDate) {
-            // If only startDate is provided, apply it for both "completed" and "in-progress"
-            whereClause.startTime = {
-                [Sequelize.Op.gte]: new Date(startDate)
-            };
+            // Create Date objects from the incoming parameters
+            startDateFilter = new Date(startDate);
+            endDateFilter = new Date(endDate);
+
+            // Set end date to the end of the specified day
+            endDateFilter.setHours(23, 59, 59, 999);
+        } else {
+            // Default to today's date if no dates are provided
+            startDateFilter = new Date();
+            startDateFilter.setHours(0, 0, 0, 0); // Start of today
+            endDateFilter = new Date();
+            endDateFilter.setHours(23, 59, 59, 999); // End of today
         }
 
+        // Ensure valid date range
+        if (startDateFilter > endDateFilter) {
+            return res.status(400).json({ message: 'Start date must be before end date' });
+        }
+
+        // Fetch assemblies with appropriate filters
         const assemblies = await Assembly.findAll({
-            where: whereClause,
+            where: {
+                status: {
+                    [Sequelize.Op.or]: ['completed', 'in-progress'] // Fetch both 'completed' and 'in-progress'
+                },
+                startTime: {
+                    [Sequelize.Op.between]: [startDateFilter, endDateFilter] // Filter by provided dates
+                }
+            },
             include: [Employee, Bike]
         });
+
         res.json(assemblies);
     } catch (error) {
+        console.error('Error fetching assemblies for the specified dates:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
-
 
 
 app.post('/api/assembly/end', async (req, res) => {

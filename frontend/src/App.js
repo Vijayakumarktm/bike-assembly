@@ -274,7 +274,7 @@ function AdminDashboard({ onLogout }) {
 
     const fetchAssemblies = async () => {
         try {
-            const response = await axios.get(`${API_URL}/assemblies/status`, {
+            const response = await axios.get(`${API_URL}/assemblies/details`, {
                 params: { startDate, endDate }
             });
             setAssemblies(response.data);
